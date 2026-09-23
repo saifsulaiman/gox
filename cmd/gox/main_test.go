@@ -176,3 +176,88 @@ func TestRunBuildWithCacheAndFlags(t *testing.T) {
 		t.Errorf("expected cache bypass with -no-cache, got:\n%s", stdout3.String())
 	}
 }
+
+func TestRunDoctorTextAndJSON(t *testing.T) {
+	// Text format
+	var stdout1, stderr1 bytes.Buffer
+	code1 := run([]string{"doctor", "-dir", "../../examples/basic", "."}, &stdout1, &stderr1)
+	if code1 != 0 {
+		t.Fatalf("run(doctor text) = %d, stderr: %s", code1, stderr1.String())
+	}
+	if !strings.Contains(stdout1.String(), "GOX Diagnostic Doctor") && len(stdout1.String()) == 0 {
+		t.Errorf("unexpected doctor output: %s", stdout1.String())
+	}
+
+	// JSON format
+	var stdout2, stderr2 bytes.Buffer
+	code2 := run([]string{"doctor", "-format", "json", "-dir", "../../examples/basic", "."}, &stdout2, &stderr2)
+	if code2 != 0 {
+		t.Fatalf("run(doctor json) = %d, stderr: %s", code2, stderr2.String())
+	}
+
+	// File output
+	tmpFile := filepath.Join(t.TempDir(), "doctor_report.txt")
+	var stdout3, stderr3 bytes.Buffer
+	code3 := run([]string{"doctor", "-output", tmpFile, "-dir", "../../examples/basic", "."}, &stdout3, &stderr3)
+	if code3 != 0 {
+		t.Fatalf("run(doctor output) = %d, stderr: %s", code3, stderr3.String())
+	}
+	if _, err := os.Stat(tmpFile); err != nil {
+		t.Errorf("expected doctor report file %s to exist", tmpFile)
+	}
+}
+
+func TestRunHelpAndUsage(t *testing.T) {
+	// No args -> usage, exit code 2
+	var stdout1, stderr1 bytes.Buffer
+	if code := run([]string{}, &stdout1, &stderr1); code != 2 {
+		t.Errorf("run([]) = %d, want 2", code)
+	}
+
+	// help command -> usage, exit code 0
+	var stdout2, stderr2 bytes.Buffer
+	if code := run([]string{"help"}, &stdout2, &stderr2); code != 0 {
+		t.Errorf("run(help) = %d, want 0", code)
+	}
+	if !strings.Contains(stdout2.String(), "usage:") {
+		t.Errorf("expected usage info in help stdout")
+	}
+
+	// -h flag
+	var stdout3, stderr3 bytes.Buffer
+	if code := run([]string{"-h"}, &stdout3, &stderr3); code != 0 {
+		t.Errorf("run(-h) = %d, want 0", code)
+	}
+}
+
+func TestRunAnalyzeFlags(t *testing.T) {
+	// -detail, -explain, -trace
+	var stdout1, stderr1 bytes.Buffer
+	code1 := run([]string{"analyze", "-detail", "-explain", "-trace", "-dir", "../../examples/basic", "."}, &stdout1, &stderr1)
+	if code1 != 0 {
+		t.Fatalf("run(analyze detail trace) = %d, stderr: %s", code1, stderr1.String())
+	}
+
+	// -output file
+	tmpOut := filepath.Join(t.TempDir(), "report.txt")
+	var stdout2, stderr2 bytes.Buffer
+	code2 := run([]string{"analyze", "-output", tmpOut, "-dir", "../../examples/basic", "."}, &stdout2, &stderr2)
+	if code2 != 0 {
+		t.Fatalf("run(analyze -output) = %d, stderr: %s", code2, stderr2.String())
+	}
+	if _, err := os.Stat(tmpOut); err != nil {
+		t.Errorf("expected report file to exist")
+	}
+
+	// -graph file
+	tmpGraph := filepath.Join(t.TempDir(), "graph.dot")
+	var stdout3, stderr3 bytes.Buffer
+	code3 := run([]string{"analyze", "-graph", tmpGraph, "-graph-format", "dot", "-dir", "../../examples/basic", "."}, &stdout3, &stderr3)
+	if code3 != 0 {
+		t.Fatalf("run(analyze -graph) = %d, stderr: %s", code3, stderr3.String())
+	}
+	if _, err := os.Stat(tmpGraph); err != nil {
+		t.Errorf("expected graph file to exist")
+	}
+}
+

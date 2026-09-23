@@ -55,3 +55,4 @@ ehthumbs.db
 *.swo
 *~
 
+*.cov

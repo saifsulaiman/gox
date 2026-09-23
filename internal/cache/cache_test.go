@@ -148,3 +148,40 @@ func TestConcurrentCacheAccess(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestCleanCacheAndCorruptFile(t *testing.T) {
+	// CleanCache with empty string
+	if err := CleanCache(""); err != nil {
+		t.Errorf("CleanCache('') expected nil, got %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	key := "corrupt_test_key"
+
+	// Store valid cache
+	res := &analyzer.Result{Version: "0.9.5"}
+	if err := StoreDecisionCache(tmpDir, key, res); err != nil {
+		t.Fatalf("StoreDecisionCache error: %v", err)
+	}
+
+	// Corrupt cache file
+	cacheFile := filepath.Join(tmpDir, "decisions", key+".json")
+	if err := os.WriteFile(cacheFile, []byte("{invalid json corrupt"), 0644); err != nil {
+		t.Fatalf("write corrupt cache file: %v", err)
+	}
+
+	// Load should fail or return not found
+	_, found, err := LoadDecisionCache(tmpDir, key)
+	if err == nil && found {
+		t.Errorf("expected error or cache miss on corrupted cache file")
+	}
+
+	// CleanCache should remove decisions folder
+	if err := CleanCache(tmpDir); err != nil {
+		t.Errorf("CleanCache error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, "decisions")); !os.IsNotExist(err) {
+		t.Errorf("expected decisions dir to be removed")
+	}
+}
+

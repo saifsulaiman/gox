@@ -131,6 +131,10 @@ func (c *Context) Abort() {
 // AbortWithStatus calls Abort and writes the HTTP status code.
 func (c *Context) AbortWithStatus(code int) {
 	c.Status(code)
+	if !c.written {
+		c.Writer.WriteHeader(code)
+		c.written = true
+	}
 	c.Abort()
 }
 

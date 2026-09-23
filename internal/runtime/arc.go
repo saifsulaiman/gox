@@ -57,12 +57,9 @@ func Retain[T any](b *Box[T]) *Box[T] {
 		return nil
 	}
 	if b.isAtomic {
-		old := b.atomicRefs.Add(1)
-		if old <= 1 {
-			// If it was 0 or negative before Add, that is an illegal resurrect or corruption.
-			if old <= 0 {
-				panic(fmt.Sprintf("gox: ARC retain of destroyed object (refcount: %d)", old))
-			}
+		newRefs := b.atomicRefs.Add(1)
+		if newRefs <= 1 {
+			panic(fmt.Sprintf("gox: ARC retain of destroyed object (refcount: %d)", newRefs))
 		}
 	} else {
 		if b.plainRefs <= 0 {

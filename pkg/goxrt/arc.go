@@ -49,12 +49,15 @@ func Retain[T any](b *Box[T]) *Box[T] {
 		return nil
 	}
 	if b.isAtomic {
-		old := b.atomicRefs.Add(1)
-		if old <= 0 {
-			panic(fmt.Sprintf("goxrt: ARC retain of destroyed object (refcount: %d)", old))
+		if b.atomicDestroy.Load() {
+			panic("goxrt: ARC retain of destroyed object")
+		}
+		newRefs := b.atomicRefs.Add(1)
+		if newRefs <= 1 {
+			panic(fmt.Sprintf("goxrt: ARC retain of destroyed object (refcount: %d)", newRefs))
 		}
 	} else {
-		if b.plainRefs <= 0 {
+		if b.plainDestroy || b.plainRefs <= 0 {
 			panic(fmt.Sprintf("goxrt: ARC retain of destroyed object (refcount: %d)", b.plainRefs))
 		}
 		b.plainRefs++

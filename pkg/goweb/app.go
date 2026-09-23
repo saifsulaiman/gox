@@ -297,6 +297,43 @@ func (g *RouteGroup) PATCH(pattern string, handlers ...HandlerFunc) {
 	g.Handle(http.MethodPatch, pattern, handlers...)
 }
 
+// HEAD registers a HEAD route within the group.
+func (g *RouteGroup) HEAD(pattern string, handlers ...HandlerFunc) {
+	g.Handle(http.MethodHead, pattern, handlers...)
+}
+
+// OPTIONS registers an OPTIONS route within the group.
+func (g *RouteGroup) OPTIONS(pattern string, handlers ...HandlerFunc) {
+	g.Handle(http.MethodOptions, pattern, handlers...)
+}
+
+// Any registers a route matching all standard HTTP methods within the group.
+func (g *RouteGroup) Any(pattern string, handlers ...HandlerFunc) {
+	methods := []string{
+		http.MethodGet, http.MethodPost, http.MethodPut,
+		http.MethodDelete, http.MethodPatch, http.MethodHead, http.MethodOptions,
+	}
+	for _, m := range methods {
+		g.Handle(m, pattern, handlers...)
+	}
+}
+
+// Static serves files from a local directory under the route group prefix.
+func (g *RouteGroup) Static(relativePath, root string) {
+	g.engine.Static(g.prefix+relativePath, root)
+}
+
+// Static serves files from a local directory under the given URL prefix.
+func (e *Engine) Static(prefix, root string) {
+	fs := http.StripPrefix(prefix, http.FileServer(http.Dir(root)))
+	pattern := strings.TrimSuffix(prefix, "/") + "/*filepath"
+	e.GET(pattern, func(c *Context) error {
+		fs.ServeHTTP(c.Writer, c.Request)
+		return nil
+	})
+}
+
+
 // SQLite returns the SQLite database instance.
 func (e *Engine) SQLite() *Database {
 	return e.sqlite
