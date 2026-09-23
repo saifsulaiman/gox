@@ -3,7 +3,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/goxlang/gox.svg)](https://pkg.go.dev/github.com/goxlang/gox)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Tests: Passing](https://img.shields.io/badge/Tests-Passing%20(0%20Races)-brightgreen.svg)]()
-[![Coverage: 85.2%](https://img.shields.io/badge/Coverage-85.2%25-brightgreen.svg)]()
+[![Coverage: 85.9%](https://img.shields.io/badge/Coverage-85.9%25-brightgreen.svg)]()
 [![Status: Production](https://img.shields.io/badge/Status-v1.0%20Production%20Release-brightgreen.svg)]()
 
 GOX is a high-performance, production-oriented Go-compatible compiler and runtime toolchain that compiles ordinary Go source code while eliminating or drastically reducing dependence on the tracing garbage collector.
@@ -285,14 +285,14 @@ GOX and GoxWeb are rigorously verified under automated testing with zero data ra
 | **`pkg/goxrt`** | **99.3%** | Public runtime API, HTTP request arena middleware, Box generics, immortal memory, edge & panic safety |
 | **`internal/runtime`** | **97.6%** | Bump Arena allocators, ARC retain/release, Weak pointers, slab recycling, refcount underflow detection |
 | **`internal/report`** | **90.6%** | Graphviz DOT generation, allocation diagnostics, explanation formatting |
-| **`internal/analyzer`** | **88.5%** | RTA Call Graph, interprocedural escape analysis, adversarial cycles, lifetime proofs |
+| **`internal/analyzer`** | **88.6%** | RTA Call Graph, interprocedural escape analysis, adversarial cycles, lifetime proofs |
 | **`internal/doctor`** | **86.1%** | Toolchain diagnostics, Go environment checks, cache integrity |
 | **`internal/region`** | **85.7%** | Region IR generation, lifetime dominance, region op formatting |
+| **`pkg/goweb`** | **83.5%** | Router, nested RouteGroup, Context pool, Multi-service (SQLite, Postgres, Redis, RabbitMQ, ES), Circuit Breaker, Idempotency, BodyLimit, RateLimiter, network RESP protocol & search mock |
 | **`internal/transform`** | **81.4%** | AST rewrite engine, recursive directory transformation, runtime emission, go.mod detection |
 | **`internal/cache`** | **78.8%** | Cryptographic SHA-256 multi-target cache, cross-compilation invalidation, cache cleaning |
 | **`cmd/gox`** | **71.8%** | CLI argument parsing, compiler build orchestration, code generation driver, doctor diagnostics, usage |
-| **`pkg/goweb`** | **81.7%** | Router, nested RouteGroup, Context pool, Multi-service (SQLite, Postgres, Redis, RabbitMQ, ES), Circuit Breaker, Idempotency, BodyLimit, RateLimiter, network RESP protocol |
-| **Total Test Suite** | **85.2%** | **45+ unit & integration tests, 100% race-free under `-race`** |
+| **Total Test Suite** | **85.9%** | **45+ unit & integration tests, 100% race-free under `-race`** |
 
 ### Running the Test Suite
 

@@ -1098,4 +1098,62 @@ func TestRedisNetworkMock(t *testing.T) {
 	_ = client.Close()
 }
 
+type mockRoundTripper func(*http.Request) (*http.Response, error)
+
+func (m mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m(req)
+}
+
+func TestSearchHTTPMode(t *testing.T) {
+	client := NewSearchClient(ElasticsearchConfig{
+		Addresses: []string{"http://127.0.0.1:9200"},
+		Username:  "elastic",
+		Password:  "secret",
+	})
+
+	client.httpClient.Transport = mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+		path := req.URL.Path
+		if strings.Contains(path, "_cluster/health") {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"status":"green"}`)),
+				Header:     make(http.Header),
+			}, nil
+		}
+		if strings.Contains(path, "_search") {
+			body := `{"took":2,"hits":{"total":{"value":1},"hits":[{"_id":"1","_score":1.0,"_source":{"name":"gox"}}]}}`
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(body)),
+				Header:     make(http.Header),
+			}, nil
+		}
+		// Index
+		return &http.Response{
+			StatusCode: 201,
+			Body:       io.NopCloser(strings.NewReader(`{"result":"created"}`)),
+			Header:     make(http.Header),
+		}, nil
+	})
+
+	ctx := context.Background()
+
+	// 1. Health
+	if err := client.Health(ctx); err != nil {
+		t.Errorf("Health failed: %v", err)
+	}
+
+	// 2. Index
+	if err := client.Index(ctx, "items", "1", map[string]string{"name": "gox"}); err != nil {
+		t.Errorf("Index failed: %v", err)
+	}
+
+	// 3. Search
+	res, err := client.Search(ctx, "items", "gox")
+	if err != nil || res.Total != 1 {
+		t.Errorf("Search failed: %v, total=%d", err, res.Total)
+	}
+}
+
+
 

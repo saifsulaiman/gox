@@ -273,3 +273,11 @@ func ConcurrentTreeWorkflow(val int) {
 		}
 	})
 }
+
+func TestLookupFieldDirectName(t *testing.T) {
+	wp := &weakProofEngine{}
+	if name := wp.lookupFieldDirectName(nil); name != "" {
+		t.Errorf("expected empty name for nil field, got %q", name)
+	}
+}
+
