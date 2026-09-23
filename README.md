@@ -288,11 +288,11 @@ GOX and GoxWeb are rigorously verified under automated testing with zero data ra
 | **`internal/runtime`** | **97.6%** | Bump Arena allocators, ARC retain/release, Weak pointers, slab recycling, refcount underflow detection |
 | **`internal/doctor`** | **96.4%** | Toolchain diagnostics, Go environment checks, escape path remediations, cache integrity |
 | **`internal/analyzer`** | **88.6%** | RTA Call Graph, interprocedural escape analysis, adversarial cycles, lifetime proofs |
-| **`pkg/goweb`** | **84.1%** | Router, nested RouteGroup, Context pool, Multi-service (SQLite, Postgres, Redis, RabbitMQ, ES), Circuit Breaker, Idempotency, BodyLimit, RateLimiter, network RESP protocol & search mock |
+| **`pkg/goweb`** | **85.5%** | Router, nested RouteGroup, Context pool (100% covered), Multi-service (SQLite, Postgres, Redis, RabbitMQ, ES), Circuit Breaker, Idempotency, BodyLimit, RateLimiter, network RESP protocol & search mock |
 | **`internal/transform`** | **81.4%** | AST rewrite engine, recursive directory transformation, runtime emission, go.mod detection |
 | **`internal/cache`** | **81.2%** | Cryptographic SHA-256 multi-target cache, cross-compilation invalidation, cache cleaning |
 | **`cmd/gox`** | **71.8%** | CLI argument parsing, compiler build orchestration, code generation driver, doctor diagnostics, usage |
-| **Total Test Suite** | **86.9%** | **50+ unit & integration tests, 100% race-free under `-race`** |
+| **Total Test Suite** | **87.5%** | **55+ unit & integration tests, 100% race-free under `-race`** |
 
 ### Running the Test Suite
 
