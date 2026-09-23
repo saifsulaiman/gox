@@ -1,0 +1,15 @@
+<ul id="todo-list" class="todo-list">
+  {{range .Todos}}
+    {{template "todo_item.html" .}}
+  {{else}}
+    <li class="empty-state">
+      <div class="empty-icon">✓</div>
+      <div class="empty-text">No tasks found. Relax or add a new one above!</div>
+    </li>
+  {{end}}
+</ul>
+
+<div id="card-footer" class="card-footer" hx-swap-oob="true">
+  <span class="stats-count"><strong>{{.ActiveCount}}</strong> items left</span>
+  <span><strong>{{.CompletedCount}}</strong> completed of <strong>{{.TotalCount}}</strong> total</span>
+</div>

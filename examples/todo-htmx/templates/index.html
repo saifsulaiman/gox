@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="High-performance reactive Todo CRUD application powered by Go, GORM, SQLite, and HTMX.">
+  <title>GOX Todo — GORM + SQLite + HTMX</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="/static/js/htmx.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="app-header">
+      <h1 class="app-title">Task Master</h1>
+      <p class="app-subtitle">Reactive CRUD powered by Go, GORM, SQLite & HTMX</p>
+      <span class="app-badge">Zero Tracing GC Overhead</span>
+    </header>
+
+    <main class="todo-card">
+      <!-- Add Todo Form -->
+      <form class="add-form" 
+            hx-post="/todos" 
+            hx-target="#todo-list-container" 
+            hx-swap="innerHTML"
+            hx-on::after-request="if(event.detail.successful) this.reset()">
+        <div class="input-row">
+          <input type="text" 
+                 name="title" 
+                 id="todo-input"
+                 class="todo-input" 
+                 placeholder="What needs to be accomplished today?" 
+                 required 
+                 autocomplete="off"
+                 autofocus>
+          <select name="priority" id="todo-priority" class="priority-select">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+          <button type="submit" id="btn-add-todo" class="btn-add">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Task
+          </button>
+        </div>
+      </form>
+
+      <!-- Filter Tabs & Actions -->
+      <nav class="filter-nav" aria-label="Task filters">
+        <div class="filter-tabs">
+          <button class="filter-btn active" 
+                  hx-get="/todos?filter=all" 
+                  hx-target="#todo-list-container" 
+                  onclick="setActiveFilter(this)">All</button>
+          <button class="filter-btn" 
+                  hx-get="/todos?filter=active" 
+                  hx-target="#todo-list-container" 
+                  onclick="setActiveFilter(this)">Active</button>
+          <button class="filter-btn" 
+                  hx-get="/todos?filter=completed" 
+                  hx-target="#todo-list-container" 
+                  onclick="setActiveFilter(this)">Completed</button>
+        </div>
+        <button class="action-btn" 
+                hx-post="/todos/clear-completed" 
+                hx-target="#todo-list-container" 
+                hx-confirm="Are you sure you want to clear all completed tasks?">Clear Completed</button>
+      </nav>
+
+      <!-- Dynamic Todo List Container -->
+      <div id="todo-list-container">
+        {{template "todo_list.html" .}}
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function setActiveFilter(btn) {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+  </script>
+</body>
+</html>

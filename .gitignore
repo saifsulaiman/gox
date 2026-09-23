@@ -1,0 +1,12 @@
+/bin/
+/gox-report.json
+/gox
+/pipeline
+.gox-cache/
+/runner
+/examples/basic/gox-basic
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.DS_Store

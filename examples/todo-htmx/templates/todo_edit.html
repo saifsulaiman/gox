@@ -1,0 +1,24 @@
+<li id="todo-{{.ID}}" class="todo-item editing">
+  <form class="edit-form" 
+        hx-put="/todos/{{.ID}}" 
+        hx-target="#todo-{{.ID}}" 
+        hx-swap="outerHTML">
+    <input type="text" 
+           name="title" 
+           class="edit-input" 
+           value="{{.Title}}" 
+           required 
+           autofocus>
+    <select name="priority" class="priority-select">
+      <option value="low" {{if eq .Priority "low"}}selected{{end}}>Low</option>
+      <option value="medium" {{if eq .Priority "medium"}}selected{{end}}>Medium</option>
+      <option value="high" {{if eq .Priority "high"}}selected{{end}}>High</option>
+    </select>
+    <button type="submit" class="btn-save">Save</button>
+    <button type="button" 
+            class="btn-cancel" 
+            hx-get="/todos/{{.ID}}" 
+            hx-target="#todo-{{.ID}}" 
+            hx-swap="outerHTML">Cancel</button>
+  </form>
+</li>
