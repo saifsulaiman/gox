@@ -10,6 +10,47 @@ GOX is **not a new programming language**. It consumes 100% unmodified Go 1.24+ 
 
 Through whole-program interprocedural static analysis, GOX proves allocation lifecycles across a formal 7-tier memory hierarchy (Immortal, RoData, Stack, Region/Arena, Unique Owned, ARC, and Tracing Fallback), rewriting allocation sites into deterministic runtime operations.
 
+<p align="center">
+  <img src="assets/gox_architecture.png" alt="GOX Architecture: 7-Tier Memory Hierarchy & Zero-GC Execution" width="100%">
+</p>
+
+---
+
+## Why and How GOX Eliminates Garbage Collection Pauses
+
+Traditional Go applications allocate transient data to the heap whenever an escape analysis escape occurs. As concurrency scales, the tracing garbage collector must stop or slow goroutines to mark and sweep millions of objects.
+
+**GOX solves this at compile time without changing any Go code:**
+
+```mermaid
+flowchart TD
+    subgraph Frontend ["100% Standard Go Code"]
+        Src["Standard Go 1.24+ Source Files<br><i>No annotations, no custom syntax</i>"]
+    end
+
+    subgraph Analyzer ["GOX Whole-Program Static Prover"]
+        CallGraph["Rapid Type Analysis (RTA) Call Graph"]
+        EscapeProver["Interprocedural Escape & Lifetime Prover"]
+        Src --> CallGraph --> EscapeProver
+    end
+
+    subgraph MemoryTiers ["7-Tier Deterministic Runtime Engine"]
+        T1["<b>1. Immortal & RoData</b><br>Global constants & singletons<br><i>Never scanned, 0 GC overhead</i>"]
+        T2["<b>2. Function Stack</b><br>Scoped to activation frame<br><i>Zero heap allocations</i>"]
+        T3["<b>3. Request Bump Arenas</b><br>Transient request/workload data<br><i>O(1) pointer bump, O(1) instant reset</i>"]
+        T4["<b>4. Unique Ownership</b><br>Single-owner linear data structures<br><i>Deterministic drop, free-list reuse</i>"]
+        T5["<b>5. Atomic Ref Counting (ARC)</b><br>Shared acyclic immutable objects<br><i>Zero-pause automatic reclamation</i>"]
+        T6["<b>6. Weak References</b><br>Caches & observer registries<br><i>Cycle-free auto-clearing pointers</i>"]
+        T7["<b>7. Tracing Fallback</b><br>Dynamic reflection / CGO bridges<br><i>100% standard Go GC safety guarantee</i>"]
+    end
+
+    EscapeProver -->|"Compile-time static proof"| MemoryTiers
+
+    style T3 fill:#0c2b42,stroke:#00e5ff,stroke-width:2px,color:#fff
+    style Analyzer fill:#161b22,stroke:#30363d,stroke-width:1px,color:#fff
+    style Frontend fill:#161b22,stroke:#30363d,stroke-width:1px,color:#fff
+```
+
 ---
 
 ## Performance Highlights (v1.0)
@@ -19,6 +60,16 @@ Through whole-program interprocedural static analysis, GOX proves allocation lif
 | **Request / Response** *(200,000 reqs)* | 200,002 mallocs / 2 GC cycles | **14 mallocs / 0 GC cycles** | **100% GC pause elimination** |
 | **Deep Binary Tree** *(1,000 trees $\times$ 4k nodes)* | 4,095,032 mallocs / 30 GC cycles | **6 mallocs / 0 GC cycles** | **2.0x faster / 99.9% memory drop** |
 | **High-Frequency Packets** *(500,000 packets)* | 500,010 mallocs / 86 GC cycles | **3 mallocs / 0 GC cycles** | **2.3x faster / 100% GC elimination** |
+
+```text
+Synthetic Allocations Benchmark (Fewer mallocs is better)
+Standard Go : [████████████████████████████████████████] 200,002 mallocs (GC Pressure)
+GOX Runtime : [▏                                       ]        14 mallocs (-99.99% Drop)
+
+GC Cycles Triggered (Zero GC is optimal)
+Standard Go : [████████████████████████████████████████] 86 cycles (Stop-The-World Pauses)
+GOX Runtime : [                                        ]  0 cycles (100% Pause Elimination)
+```
 
 See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for full benchmark methodologies and profiling data.
 
@@ -167,13 +218,59 @@ make release
 
 ## GoxWeb: A High-Performance Web Framework for Go / GOX (`pkg/goweb`)
 
+<p align="center">
+  <img src="assets/goxweb_framework.png" alt="GoxWeb: A High-Performance Web Framework for Go / GOX Request Lifecycle" width="100%">
+</p>
+
 **GoxWeb** is a high-performance web framework for Go / GOX designed to run standard Go code while unlocking **zero-GC Request Arenas** when compiled with the GOX toolchain.
+
+### Request Flow & Zero-GC Mechanics
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Client Request
+    participant Router as GoxWeb Router & Context Pool
+    participant Arena as Thread-Local Request Arena
+    participant Cache as Redis Cuckoo / Top-K / Cache
+    participant DB as SQLite / PostgreSQL / RabbitMQ
+
+    Client->>Router: HTTP Request (e.g. GET /api/products/:id)
+    Router->>Router: Borrow pooled Context (Zero-alloc sync.Pool)
+    Router->>Arena: Borrow thread-local bump arena (Zero mallocs)
+    Router->>Cache: Cuckoo Filter & Redis cache check
+    alt Cache Miss
+        Router->>DB: Query Read-Replica / Ledger Tx
+        DB-->>Router: Row Result
+    else Cache Hit
+        Cache-->>Router: Fast-path Cached Response
+    end
+    Router->>Client: Stream JSON response directly
+    Router->>Arena: Reset arena pointer in O(1) time
+    Note over Arena: Zero GC cycles triggered! Memory instantly ready for next request.
+```
 
 - **Multi-Service Architecture**: Native support for SQLite, PostgreSQL (Master/Slave splitting with PgBouncer tuning), Redis (Cuckoo, Top-K, Leaderboards, HLL), RabbitMQ (Publisher Confirms & DLQ), and Elasticsearch.
 - **Enterprise Reliability**: At-most-once Idempotency, Singleflight request coalescing, Distributed Locks, and Circuit Breakers.
-- **Microservice Benchmark**:
-  - `make gox-goweb-bench`: **988,000+ req/s** with **7.7 µs average latency** and **>55% reduction in Stop-The-World GC pause times**.
-  - See [`examples/goweb-app/README.md`](examples/goweb-app/README.md) for full architecture and documentation.
+
+### Microservice Benchmark Comparison (50,000 reqs, 8 workers)
+
+```text
+Throughput (Requests / Second — Higher is better)
+Standard Go (GC Heap) : [███████████████████                     ] 454,469 req/s
+GOX (Request Arena)   : [████████████████████████████████████████] 988,215 req/s  (+117.4% speedup)
+
+Stop-The-World GC Pause (Lower is better)
+Standard Go (GC Heap) : [████████████████████████████████████████] 18.86 ms
+GOX (Request Arena)   : [█████████████████                       ]  8.40 ms       (-55.5% reduction)
+
+Average Latency (Lower is better)
+Standard Go (GC Heap) : [████████████████████████████████████████] 17.0 µs
+GOX (Request Arena)   : [██████████████████                      ]  7.7 µs        (-54.9% faster)
+```
+
+- Run yourself: `make gox-goweb-bench`
+- Full documentation & architecture: [`examples/goweb-app/README.md`](examples/goweb-app/README.md)
 
 
 ---

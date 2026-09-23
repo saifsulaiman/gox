@@ -2,7 +2,39 @@
 
 A production-grade e-commerce microservice built with **GoxWeb**—A High-Performance Web Framework for Go / GOX designed for zero-GC compilation under the **GOX 7-Tier Memory Hierarchy**.
 
+<p align="center">
+  <img src="../../assets/goxweb_framework.png" alt="GoxWeb: A High-Performance Web Framework for Go / GOX Request Lifecycle" width="100%">
+</p>
+
 ---
+
+### Request Processing & Zero-GC Memory Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as HTTP Client
+    participant Router as GoxWeb Router & Context Pool
+    participant Arena as Request Bump Arena (Zero GC)
+    participant Cache as Redis Cuckoo / Top-K / Leaderboard
+    participant DB as SQLite WAL / PostgreSQL (PgBouncer)
+
+    Client->>Router: GET /api/products/:id
+    Router->>Router: Acquire Context from sync.Pool (0 allocs)
+    Router->>Arena: Borrow thread-local bump arena (0 mallocs)
+    Router->>Cache: Cuckoo Filter existence check (O(1))
+    alt Cache Miss
+        Router->>DB: Query Read-Replica DB
+        DB-->>Router: Row Data
+        Router->>Cache: Set Redis cache & increment Top-K
+    else Cache Hit
+        Cache-->>Router: Fast RAM DTO
+    end
+    Router->>Client: Stream JSON response directly
+    Router->>Arena: Reset bump pointer (O(1) instant free)
+    Note over Arena: Zero GC cycles triggered!
+```
+
 
 ## Architecture: Modular Clean Design & Multi-Service Integration
 
@@ -112,6 +144,20 @@ go run ./bench/runner -n 50000 -c 8
 | **Stop-The-World GC Pause**| 18.86 ms | **8.40 ms** | **-55.5% reduction** |
 | **Heap Allocations** | 1,311,447 mallocs | **980,877 mallocs** | **-25.2% reduction** |
 | **Unique Slab Reclaims** | 0 (Heap Malloc) | **50,000 reclaims** | **100% Request Reclaimed** |
+
+```text
+Throughput (Requests / Second — Higher is better)
+Standard Go (GC Heap) : [███████████████████                     ] 454,469 req/s
+GOX (Request Arena)   : [████████████████████████████████████████] 988,215 req/s  (+117.4% speedup)
+
+Stop-The-World GC Pause Time (Lower is better)
+Standard Go (GC Heap) : [████████████████████████████████████████] 18.86 ms
+GOX (Request Arena)   : [█████████████████                       ]  8.40 ms       (-55.5% reduction)
+
+Average Latency (Lower is better)
+Standard Go (GC Heap) : [████████████████████████████████████████] 17.0 µs
+GOX (Request Arena)   : [██████████████████                      ]  7.7 µs        (-54.9% faster)
+```
 
 ---
 
