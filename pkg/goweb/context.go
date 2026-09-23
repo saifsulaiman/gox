@@ -179,8 +179,10 @@ func (c *Context) Arena() *goxrt.Arena {
 	if c.arena != nil {
 		return c.arena
 	}
-	// Fall back to context inspection if available
-	return goxrt.GetRequestArena(c.Request.Context())
+	if c.Request != nil {
+		return goxrt.GetRequestArena(c.Request.Context())
+	}
+	return nil
 }
 
 // Param returns the value of a URL parameter.

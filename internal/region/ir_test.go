@@ -53,6 +53,60 @@ func TestRegionDescriptorOutlives(t *testing.T) {
 	}
 }
 
+func TestRegionDescriptorEdgeCoverage(t *testing.T) {
+	var nilR *RegionDescriptor
+	r1 := &RegionDescriptor{ID: "reg:1", Scope: ScopeCaller, Depth: 1}
+	r2 := &RegionDescriptor{ID: "reg:2", Scope: ScopeFunction, Depth: 2}
+	r3 := &RegionDescriptor{ID: "reg:3", Scope: ScopeLexical, Depth: 3}
+	rReq := &RegionDescriptor{ID: "reg:req", Scope: ScopeRequest, Depth: 1}
+
+	// Nil checks
+	if nilR.Outlives(r1) {
+		t.Error("nil descriptor cannot outlive r1")
+	}
+	if r1.Outlives(nilR) {
+		t.Error("r1 cannot outlive nil descriptor")
+	}
+	if err := CheckReferenceLegality(nil, r1); err != nil {
+		t.Errorf("nil source region should be legal: %v", err)
+	}
+	if err := CheckReferenceLegality(r1, nil); err != nil {
+		t.Errorf("nil target region should be legal: %v", err)
+	}
+
+	// Same ID
+	sameID := &RegionDescriptor{ID: "reg:1", Scope: ScopeFunction, Depth: 5}
+	if !r1.Outlives(sameID) {
+		t.Error("same ID should report outlives")
+	}
+
+	// ScopeCaller outlives ScopeFunction & ScopeLexical
+	if !r1.Outlives(r2) {
+		t.Error("ScopeCaller should outlive ScopeFunction")
+	}
+	if !r1.Outlives(r3) {
+		t.Error("ScopeCaller should outlive ScopeLexical")
+	}
+
+	// ScopeRequest outlives ScopeFunction & ScopeLexical
+	if !rReq.Outlives(r2) {
+		t.Error("ScopeRequest should outlive ScopeFunction")
+	}
+	if !rReq.Outlives(r3) {
+		t.Error("ScopeRequest should outlive ScopeLexical")
+	}
+
+	// Depth comparison
+	dShallow := &RegionDescriptor{ID: "reg:shallow", Scope: ScopeNested, Depth: 2}
+	dDeep := &RegionDescriptor{ID: "reg:deep", Scope: ScopeNested, Depth: 5}
+	if !dShallow.Outlives(dDeep) {
+		t.Error("shallow depth should outlive deep depth")
+	}
+	if dDeep.Outlives(dShallow) {
+		t.Error("deep depth should not outlive shallow depth")
+	}
+}
+
 func TestRegionOpFormatting(t *testing.T) {
 	op := RegionOp{
 		Kind:     OpRegionAlloc,

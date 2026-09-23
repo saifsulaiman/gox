@@ -185,3 +185,28 @@ func TestCleanCacheAndCorruptFile(t *testing.T) {
 	}
 }
 
+func TestCacheEmptyInputs(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Load empty inputs
+	res, found, err := LoadDecisionCache("", "key")
+	if err != nil || found || res != nil {
+		t.Errorf("expected nil for empty cacheDir: %v, %v, %v", res, found, err)
+	}
+	res, found, err = LoadDecisionCache(tmpDir, "")
+	if err != nil || found || res != nil {
+		t.Errorf("expected nil for empty key: %v, %v, %v", res, found, err)
+	}
+
+	// Store empty inputs
+	if err := StoreDecisionCache("", "key", &analyzer.Result{}); err != nil {
+		t.Errorf("expected nil for empty cacheDir store: %v", err)
+	}
+	if err := StoreDecisionCache(tmpDir, "", &analyzer.Result{}); err != nil {
+		t.Errorf("expected nil for empty key store: %v", err)
+	}
+	if err := StoreDecisionCache(tmpDir, "key", nil); err != nil {
+		t.Errorf("expected nil for nil result store: %v", err)
+	}
+}
+

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -1152,6 +1153,132 @@ func TestSearchHTTPMode(t *testing.T) {
 	res, err := client.Search(ctx, "items", "gox")
 	if err != nil || res.Total != 1 {
 		t.Errorf("Search failed: %v, total=%d", err, res.Total)
+	}
+}
+
+func TestContextGettersComprehensive(t *testing.T) {
+	// Nil engine context
+	cNil := &Context{}
+	if cNil.SQLite() != nil || cNil.Postgres() != nil || cNil.DB() != nil {
+		t.Error("nil engine should return nil DBs")
+	}
+	if cNil.ReadDB() != nil || cNil.WriteDB() != nil {
+		t.Error("nil engine should return nil SQL DBs")
+	}
+	if cNil.Redis() != nil || cNil.Queue() != nil || cNil.Search() != nil || cNil.Bloom() != nil {
+		t.Error("nil engine should return nil client integrations")
+	}
+	if cNil.Method() != "" {
+		t.Error("nil request method should be empty")
+	}
+	if cNil.Arena() != nil {
+		t.Error("nil arena should return nil")
+	}
+	if val, err := cNil.ParamInt("id"); err == nil || val != 0 {
+		t.Error("empty params should error on ParamInt")
+	}
+
+	// Active engine context
+	app := New(Config{})
+	db, err := NewDatabase(DBConfig{Driver: DBSQLite, DSN: "file::memory:?cache=shared&mode=rwc"})
+	if err == nil {
+		app.sqlite = db
+	}
+	req, _ := http.NewRequest("POST", "/test/123", nil)
+	req.Header.Set("X-Forwarded-For", "198.51.100.1, 10.0.0.1")
+	w := httptest.NewRecorder()
+	c := &Context{
+		Writer:  w,
+		Request: req,
+		Params:  Params{Param{Key: "id", Value: "123"}, Param{Key: "bad", Value: "abc"}},
+		engine:  app,
+		keys:    map[string]any{"key1": "val1"},
+	}
+
+	if c.Method() != "POST" {
+		t.Errorf("expected POST, got %s", c.Method())
+	}
+	idVal, err := c.ParamInt("id")
+	if err != nil || idVal != 123 {
+		t.Errorf("expected 123, got %d (%v)", idVal, err)
+	}
+	if _, err := c.ParamInt("bad"); err == nil {
+		t.Error("expected error for non-integer paramInt")
+	}
+	if c.Params.Get("id") != "123" {
+		t.Errorf("expected 123 from Params.Get, got %s", c.Params.Get("id"))
+	}
+	var countParams int
+	for k, v := range c.Params.All() {
+		if k != "" && v != "" {
+			countParams++
+		}
+	}
+	if countParams != 2 {
+		t.Errorf("expected 2 params from Params.All(), got %d", countParams)
+	}
+	if c.SQLite() == nil || c.DB() == nil {
+		t.Error("expected valid sqlite DB instance")
+	}
+	c.UsePrimaryDB()
+	if c.WriteDB() == nil || c.ReadDB() == nil {
+		t.Error("expected valid read/write sql.DB")
+	}
+	if c.Redis() == nil || c.Queue() == nil || c.Search() == nil || c.Bloom() == nil {
+		t.Error("expected valid default clients on app context")
+	}
+	v, ok := c.Get("key1")
+	if !ok || v != "val1" {
+		t.Error("expected key1 from c.Get")
+	}
+	if c.RealIP() != "198.51.100.1" {
+		t.Errorf("expected 198.51.100.1, got %s", c.RealIP())
+	}
+	if err := c.Error(http.StatusBadRequest, "invalid request"); err != nil {
+		t.Errorf("Error() returned error: %v", err)
+	}
+}
+
+func TestDatabaseEdgeComprehensive(t *testing.T) {
+	db, err := NewDatabase(DBConfig{Driver: DBSQLite, DSN: "file::memory:?cache=shared&mode=rwc"})
+	if err != nil {
+		t.Fatalf("failed to init in-memory sqlite: %v", err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+	if err := db.Ping(ctx); err != nil {
+		t.Errorf("Ping failed: %v", err)
+	}
+
+	// Add replica
+	if err := db.AddReplica("file::memory:?cache=shared&mode=rwc"); err != nil {
+		t.Fatalf("failed to add replica: %v", err)
+	}
+
+	// Test retryable error detection
+	if !isRetryableDBError(fmt.Errorf("database is locked")) {
+		t.Error("expected locked to be retryable")
+	}
+	if isRetryableDBError(fmt.Errorf("syntax error in SQL")) {
+		t.Error("expected syntax error not to be retryable")
+	}
+
+	// Test WithTxRetry
+	attempts := 0
+	err = db.WithTxRetry(ctx, 3, func(tx *sql.Tx) error {
+		attempts++
+		if attempts < 2 {
+			return fmt.Errorf("database is locked")
+		}
+		_, err := tx.Exec("CREATE TABLE IF NOT EXISTS items (id INT);")
+		return err
+	})
+	if err != nil {
+		t.Errorf("WithTxRetry failed: %v", err)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
 	}
 }
 

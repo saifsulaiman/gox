@@ -120,3 +120,88 @@ func TestDiagnoseIssues(t *testing.T) {
 		t.Errorf("expected health_score_pct: 0 in json:\n%s", string(jsonData))
 	}
 }
+
+func TestDiagnoseMoreIssues(t *testing.T) {
+	result := &analyzer.Result{
+		Decisions: []analyzer.AllocationDecision{
+			{
+				AllocationID:   "alloc:1",
+				SourcePosition: "main.go:10:1",
+				Function:       "main.run",
+				Strategy:       analyzer.StrategyImmortal,
+				Confidence:     analyzer.ConfidenceProven,
+			},
+			{
+				AllocationID:   "alloc:2",
+				SourcePosition: "main.go:20:1",
+				Function:       "main.closure",
+				Strategy:       analyzer.StrategyTracingFallback,
+				Confidence:     analyzer.ConfidenceUnproven,
+				BlockingReasons: []analyzer.BlockingReason{
+					{Construct: "closure", Description: "captured in closure"},
+				},
+			},
+			{
+				AllocationID:   "alloc:3",
+				SourcePosition: "main.go:30:1",
+				Function:       "main.cycle",
+				Strategy:       analyzer.StrategyTracingFallback,
+				Confidence:     analyzer.ConfidenceUnproven,
+				BlockingReasons: []analyzer.BlockingReason{
+					{Construct: "cycle", Description: "cyclic pointer graph"},
+				},
+			},
+			{
+				AllocationID:   "alloc:4",
+				SourcePosition: "main.go:40:1",
+				Function:       "main.global",
+				Strategy:       analyzer.StrategyTracingFallback,
+				Confidence:     analyzer.ConfidenceUnproven,
+				BlockingReasons: []analyzer.BlockingReason{
+					{Kind: "global_ref", Description: "stored in global variable"},
+				},
+			},
+			{
+				AllocationID:   "alloc:5",
+				SourcePosition: "main.go:50:1",
+				Function:       "main.fb1",
+				Strategy:       analyzer.StrategyTracingFallback,
+				Confidence:     analyzer.ConfidenceUnproven,
+				FallbackReason: "dynamic external invocation",
+			},
+			{
+				AllocationID:   "alloc:6",
+				SourcePosition: "main.go:60:1",
+				Function:       "main.fb2",
+				Strategy:       analyzer.StrategyTracingFallback,
+				Confidence:     analyzer.ConfidenceUnproven,
+				FallbackReason: "exported api return",
+			},
+			{
+				AllocationID:   "alloc:7",
+				SourcePosition: "main.go:70:1",
+				Function:       "main.fb3",
+				Strategy:       analyzer.StrategyTracingFallback,
+				Confidence:     analyzer.ConfidenceUnproven,
+				FallbackReason: "unbounded escape",
+			},
+		},
+	}
+
+	report := Diagnose(result)
+	if report.HealthScore <= 0 || report.HealthScore >= 80 {
+		t.Logf("HealthScore: %.1f%%", report.HealthScore)
+	}
+
+	text := report.FormatText(10)
+	for _, want := range []string{
+		"Closure Capture & Goroutine Escapes",
+		"Cyclic Pointer Graphs",
+		"Mutable Global State",
+		"Complex Escape Paths",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("FormatText missing %q:\n%s", want, text)
+		}
+	}
+}
