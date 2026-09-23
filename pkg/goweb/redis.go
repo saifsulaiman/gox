@@ -1119,6 +1119,9 @@ func (rc *RedisClient) LeaderboardRemove(ctx context.Context, key, member string
 // HyperLogLogAdd adds elements to a HyperLogLog structure.
 func (rc *RedisClient) HyperLogLogAdd(ctx context.Context, key string, elements ...string) (bool, error) {
 	rc.mu.Lock()
+	if rc.hllData == nil {
+		rc.hllData = make(map[string]map[string]bool)
+	}
 	set, ok := rc.hllData[key]
 	if !ok {
 		set = make(map[string]bool)

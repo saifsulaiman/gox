@@ -1000,54 +1000,41 @@ func TestSearchHealth(t *testing.T) {
 	}
 }
 
-// TestRedisNetworkMock tests RedisClient over mock TCP socket.
+// TestRedisNetworkMock tests RedisClient over mock in-memory net.Pipe full-duplex socket.
 func TestRedisNetworkMock(t *testing.T) {
-	// Start mock Redis TCP server
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Skipf("skipping mock network test (sandboxed environment): %v", err)
-	}
-	defer ln.Close()
+	serverConn, clientConn := net.Pipe()
+	defer serverConn.Close()
 
 	go func() {
+		buf := make([]byte, 1024)
 		for {
-			conn, err := ln.Accept()
+			n, err := serverConn.Read(buf)
 			if err != nil {
 				return
 			}
-			go func(c net.Conn) {
-				defer c.Close()
-				buf := make([]byte, 1024)
-				for {
-					n, err := c.Read(buf)
-					if err != nil {
-						return
-					}
-					req := string(buf[:n])
-					if strings.Contains(req, "PING") {
-						_, _ = c.Write([]byte("+PONG\r\n"))
-					} else if strings.Contains(req, "SET") {
-						_, _ = c.Write([]byte("+OK\r\n"))
-					} else if strings.Contains(req, "GET") {
-						_, _ = c.Write([]byte("$5\r\nhello\r\n"))
-					} else if strings.Contains(req, "DEL") {
-						_, _ = c.Write([]byte(":1\r\n"))
-					} else if strings.Contains(req, "INCR") {
-						_, _ = c.Write([]byte(":2\r\n"))
-					} else {
-						_, _ = c.Write([]byte("+OK\r\n"))
-					}
-				}
-			}(conn)
+			req := string(buf[:n])
+			if strings.Contains(req, "PING") {
+				_, _ = serverConn.Write([]byte("+PONG\r\n"))
+			} else if strings.Contains(req, "GET") {
+				_, _ = serverConn.Write([]byte("$5\r\nhello\r\n"))
+			} else if strings.Contains(req, "DEL") || strings.Contains(req, "EVAL") || strings.Contains(req, "PF") || strings.Contains(req, "Z") || strings.Contains(req, "PUBLISH") || strings.Contains(req, "BF") || strings.Contains(req, "CF") {
+				_, _ = serverConn.Write([]byte(":1\r\n"))
+			} else if strings.Contains(req, "INCR") {
+				_, _ = serverConn.Write([]byte(":2\r\n"))
+			} else {
+				_, _ = serverConn.Write([]byte("+OK\r\n"))
+			}
 		}
 	}()
 
 	client := NewRedisClient(RedisConfig{
-		Addr:        ln.Addr().String(),
-		PoolSize:    2,
-		DialTimeout: 1 * time.Second,
+		Addr:        "memory",
+		DialTimeout: 2 * time.Second,
+		PoolSize:    1,
 	})
-	defer client.Close()
+	client.isMemory = false
+	client.connPool = make(chan net.Conn, 1)
+	client.connPool <- clientConn
 
 	ctx := context.Background()
 
@@ -1077,6 +1064,38 @@ func TestRedisNetworkMock(t *testing.T) {
 	if err := client.Del(ctx, "k1"); err != nil {
 		t.Errorf("mock Redis Del failed: %v", err)
 	}
+
+	// 6. Lock, Renew, Unlock
+	lock, err := client.Lock(ctx, "network_lock", 5*time.Second)
+	if err != nil {
+		t.Errorf("network Lock failed: %v", err)
+	} else {
+		_ = lock.Renew(ctx, 10*time.Second)
+		_ = lock.Unlock(ctx)
+	}
+
+	// 7. PubSub
+	_ = client.Publish(ctx, "chan", "msg")
+
+	// 8. HyperLogLog
+	_, _ = client.HyperLogLogAdd(ctx, "hll", "a", "b")
+	_, _ = client.HyperLogLogCount(ctx, "hll")
+
+	// 9. Bloom & Cuckoo
+	_ = client.BloomAdd(ctx, "bf", "item")
+	_, _ = client.BloomContains(ctx, "bf", "item")
+	_ = client.CuckooAdd(ctx, "cf", "item")
+	_, _ = client.CuckooContains(ctx, "cf", "item")
+	_, _ = client.CuckooDelete(ctx, "cf", "item")
+
+	// 10. TopK & Leaderboard
+	_ = client.TopKReserve(ctx, "topk", 5)
+	_, _ = client.TopKAdd(ctx, "topk", "item")
+	_ = client.LeaderboardAdd(ctx, "lb", "usr", 100)
+	_, _ = client.LeaderboardIncrBy(ctx, "lb", "usr", 10)
+	_ = client.LeaderboardRemove(ctx, "lb", "usr")
+
+	_ = client.Close()
 }
 
 
