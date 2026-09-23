@@ -161,6 +161,17 @@ GOX (Request Arena)   : [██████████████████ 
 
 ---
 
+## Automated Testing
+
+The complete microservice application is verified with end-to-end integration tests covering all REST endpoints, singleflight caching, Bloom filter protection, JWT auth, and idempotent order transactions:
+
+```bash
+# Run microservice integration test suite
+go test -v -cover ./...
+```
+
+---
+
 ## Disclaimer & Limitation of Liability
 
 > [!IMPORTANT]

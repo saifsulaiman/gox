@@ -1,10 +1,21 @@
-.PHONY: build test benchmark lint vulncheck vulncheck-verbose example bench-comparative release todo-test todo-bench todo-run
+.PHONY: build test test-race test-all coverage benchmark lint vulncheck vulncheck-verbose example bench-comparative release todo-test todo-bench todo-run
 
 build:
 	go build -o bin/gox ./cmd/gox
 
 test:
-	go test ./...
+	go test ./cmd/... ./internal/... ./pkg/...
+
+test-race:
+	go test -count=1 -race ./cmd/... ./internal/... ./pkg/...
+
+test-all: test-race
+	cd examples/goweb-app && go test -count=1 -v ./...
+
+coverage:
+	go test -coverprofile=coverage.out -covermode=atomic ./cmd/... ./internal/... ./pkg/...
+	go tool cover -func=coverage.out
+	@rm -f coverage.out
 
 benchmark:
 	go test -bench=. -benchmem ./benchmarks
