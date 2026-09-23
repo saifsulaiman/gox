@@ -1,12 +1,57 @@
-/bin/
-/gox-report.json
-/gox
-/pipeline
+# ==========================================
+# GOX & Compiler Build Artifacts
+# ==========================================
+bin/
+dist/
+gox
+gox-report.json
+pipeline
+runner
+examples/basic/gox-basic
 .gox-cache/
-/runner
-/examples/basic/gox-basic
+**/.gox-cache/
+
+# ==========================================
+# Go Binaries, Tests & Coverage Profiles
+# ==========================================
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.txt
+*.prof
+*.pprof
+
+# ==========================================
+# Databases & Local State
+# ==========================================
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
+*.sqlite
+*.sqlite3
+
+# ==========================================
+# Environment & Local Secrets
+# ==========================================
+.env
+.env.*
+!.env.example
+
+# ==========================================
+# Operating System & Editor Artifacts
+# ==========================================
 .DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+.idea/
+*.swp
+*.swo
+*~
+
